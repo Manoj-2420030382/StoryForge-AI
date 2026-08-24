@@ -1,0 +1,12 @@
+package com.fooddelivery.dto;
+
+import lombok.Data;
+
+@Data
+public class OrderRequest {
+    private String customerName;
+    private Long restaurantId;
+    private String foodItem;
+    private Integer quantity;
+    private String status;
+}

@@ -1,0 +1,104 @@
+package com.fooddelivery.controller;
+
+import com.fooddelivery.client.RestaurantClient;
+import com.fooddelivery.dto.OrderRequest;
+import com.fooddelivery.dto.RestaurantDTO;
+import com.fooddelivery.entity.*;
+import com.fooddelivery.repository.OrderRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/orders")
+@CrossOrigin(origins = "*")
+public class OrderController {
+
+    @Autowired
+    private OrderRepository orderRepository;
+    
+    @Autowired
+    private RestaurantClient restaurantClient;
+
+    // Create a new order
+    @PostMapping
+    public ResponseEntity<?> createOrder(@RequestBody OrderRequest orderRequest) {
+        try {
+            // Verify restaurant exists
+            RestaurantDTO restaurant = restaurantClient.getRestaurantById(orderRequest.getRestaurantId());
+            if (restaurant == null) {
+                return ResponseEntity.badRequest().body("Restaurant not found with ID: " + orderRequest.getRestaurantId());
+            }
+            
+            Order order = new Order();
+            order.setCustomerName(orderRequest.getCustomerName());
+            order.setRestaurantId(orderRequest.getRestaurantId());
+            order.setFoodItem(orderRequest.getFoodItem());
+            order.setQuantity(orderRequest.getQuantity());
+            order.setStatus("PLACED");
+            order.setOrderDate(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            
+            Order savedOrder = orderRepository.save(order);
+            return new ResponseEntity<>(savedOrder, HttpStatus.CREATED);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error creating order: " + e.getMessage());
+        }
+    }
+
+    // Get all orders
+    @GetMapping
+    public List<Order> getAllOrders() {
+        return orderRepository.findAll();
+    }
+
+    // Get order by ID
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getOrderById(@PathVariable Long id) {
+        Optional<Order> order = orderRepository.findById(id);
+        if (order.isPresent()) {
+            return ResponseEntity.ok(order.get());
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    // Get orders by restaurant ID
+    @GetMapping("/restaurant/{restaurantId}")
+    public List<Order> getOrdersByRestaurant(@PathVariable Long restaurantId) {
+        return orderRepository.findByRestaurantId(restaurantId);
+    }
+
+    // Get orders by customer name
+    @GetMapping("/customer/{customerName}")
+    public List<Order> getOrdersByCustomer(@PathVariable String customerName) {
+        return orderRepository.findByCustomerName(customerName);
+    }
+
+    // Update order status
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<?> updateOrderStatus(@PathVariable Long id, @RequestBody String status) {
+        Optional<Order> optionalOrder = orderRepository.findById(id);
+        if (optionalOrder.isPresent()) {
+            Order order = optionalOrder.get();
+            order.setStatus(status);
+            Order updatedOrder = orderRepository.save(order);
+            return ResponseEntity.ok(updatedOrder);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    // Delete order
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
+        if (orderRepository.existsById(id)) {
+            orderRepository.deleteById(id);
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+}
